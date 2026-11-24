@@ -1,0 +1,70 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title data-i18n="opt_title"></title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="options.css">
+</head>
+<body>
+<main>
+  <header>
+    <svg class="mark" viewBox="168 152 720 720" aria-hidden="true"><g fill="currentColor"><polygon points="204,234 306,234 532,460 430,460"/><polygon points="204,790 306,790 532,564 430,564"/><rect x="510" y="234" width="342" height="72"/><rect x="510" y="718" width="342" height="72"/><rect x="510" y="234" width="72" height="226"/><rect x="510" y="564" width="72" height="226"/></g><circle cx="704" cy="512" r="56" fill="#C5A229"/></svg>
+    <h1 data-i18n="opt_title"></h1>
+  </header>
+  <p id="how" class="lead"></p>
+
+  <section class="card" id="connection" data-view="loading">
+    <h2 data-i18n="opt_connect"></h2>
+
+    <div id="view-connected" class="view">
+      <p id="connected-line"></p>
+      <p class="hint" data-i18n="opt_connected_hint"></p>
+      <p id="server-line" class="hint"></p>
+      <p id="queued-line" class="hint" hidden></p>
+      <div class="row">
+        <button id="disconnect" class="ghost" data-i18n="opt_disconnect"></button>
+        <span class="hint" data-i18n="opt_disconnect_hint"></span>
+      </div>
+      <p id="disconnect-error" class="danger" role="alert" hidden></p>
+    </div>
+
+    <div id="view-connect" class="view">
+      <label for="name" data-i18n="opt_name_label"></label>
+      <input id="name" type="text" maxlength="60" autocomplete="off" spellcheck="false">
+      <p class="hint" data-i18n="opt_name_hint"></p>
+      <div id="code" class="code" aria-live="polite"></div>
+      <p id="code-say" data-i18n="opt_code_say"></p>
+      <div class="row">
+        <button id="approve" data-i18n="opt_code_open"></button>
+        <button id="again" class="ghost" data-i18n="opt_again" hidden></button>
+      </div>
+      <p id="code-state" class="hint" role="status"></p>
+      <p id="connect-server-line" class="hint"></p>
+      <p id="connect-queued-line" class="hint" hidden></p>
+    </div>
+
+    <div id="view-grant" class="view">
+      <p id="grant-line"></p>
+      <div class="row"><button id="grant" data-i18n="opt_server_grant_button"></button></div>
+    </div>
+  </section>
+
+  <details class="card" id="advanced">
+    <summary data-i18n="opt_advanced"></summary>
+    <label for="server" data-i18n="opt_server_label"></label>
+    <input id="server" type="url" autocomplete="off" spellcheck="false">
+    <p class="hint" data-i18n="opt_server_hint"></p>
+    <div class="row"><button id="server-save" class="ghost" data-i18n="opt_server_save"></button></div>
+    <p id="server-error" class="danger" role="alert" hidden></p>
+  </details>
+
+  <section class="plain">
+    <h2 data-i18n="opt_privacy_title"></h2>
+    <p class="hint" data-i18n="opt_privacy"></p>
+  </section>
+</main>
+<script type="module" src="options.js"></script>
+</body>
+</html>

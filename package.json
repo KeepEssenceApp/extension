@@ -1,0 +1,28 @@
+{
+  "name": "keepessence-extension",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Save pages, text and images to KeepEssence from the browser.",
+  "license": "AGPL-3.0-only",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "gen": "node build.mjs --gen",
+    "build": "node build.mjs",
+    "build:test": "node build.mjs --test",
+    "typecheck": "node build.mjs --gen && tsc --noEmit",
+    "test": "node build.mjs --gen && node --test \"tests/unit/*.test.ts\"",
+    "test:e2e": "node build.mjs && node build.mjs --test && node --test --test-concurrency=1 \"tests/e2e/*.test.mjs\"",
+    "fake-core": "node dev/fake-core.mjs"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.3.7",
+    "@types/node": "^26.6.6",
+    "esbuild": "^0.28.2",
+    "playwright": "^1.65.1",
+    "typescript": "^7.0.2",
+    "yaml": "^2.9.1"
+  }
+}
