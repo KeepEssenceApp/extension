@@ -169,6 +169,9 @@ test('E2 keyboard command: saves the page, with the selected text when there is 
 });
 
 test('E2 context menu: the page, the selection, a link, an image', T, async () => {
+  /* the four entries exist in the browser's menu (updating one that does not exist is an error) */
+  for (const entry of ['save-page', 'save-selection', 'save-link', 'save-image']) await inWorker((e) => chrome.contextMenus.update(e, {}), entry);
+
   const page = await open(`${site.url}/menu`);
   const pageUrl = `${site.url}/menu`;
 
@@ -204,6 +207,13 @@ test('E2 context menu: the page, the selection, a link, an image', T, async () =
     const put = backend.fake.state.requests.find((r) => r.method === 'PUT');
     assert.equal(put.headers.authorization, undefined, 'the credential is not sent to the upload address');
   }
+
+  /* another site's image, which the browser may not read: its address is saved as a link, and the sentence is still the core's */
+  const foreign = `${site.closedUrl}/big.png`;
+  await menu(page, { menuItemId: 'save-image', pageUrl, srcUrl: foreign });
+  const asLink = await until('the image saved by its address', async () => (await itemsWith((i) => i.url === foreign))[0], 30000);
+  assert.equal(asLink.kind, 'link');
+  await expectToast(page, say('saved'));
 
   /* the same image again: the same bytes are not uploaded twice */
   const uploads = backend.fake?.state.requests.filter((r) => r.method === 'PUT').length;

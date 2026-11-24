@@ -54,5 +54,5 @@
   "opt_server_grant_button": { "message": "Allow" },
   "opt_unreachable": { "message": "KeepEssence could not be reached" },
   "opt_privacy_title": { "message": "What it can see" },
-  "opt_privacy": { "message": "This extension works only when you press it. It reads the address and title of the current page and the text you selected, or the link or image you right-clicked, and saves that to your KeepEssence. It reads no other page and nothing else, and collects no data. When you are not pressing it, it does one thing only: it sends what is queued. It cannot see what you saved before. The browser asks for no permission when you install it; it asks once only if you change the address to one you host yourself." }
+  "opt_privacy": { "message": "This extension works only when you press it. It reads the address and title of the current page and the text you selected, or the link or image you right-clicked, and saves that to your KeepEssence. It reads no other page and nothing else, and collects no data. When you are not pressing it, it does one thing only: it sends what is queued. It cannot see what you saved before. When you install it the browser lists two things: reading and changing your data on keepessence.app (that is your KeepEssence), and showing notifications. It does not ask again, except once if you change the address to one you host yourself." }
 }
