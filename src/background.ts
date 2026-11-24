@@ -151,7 +151,12 @@ function withQueue<T>(change: (queue: PendingSave[]) => Promise<{ queue: Pending
   return next;
 }
 
-const keep = (entry: PendingSave) => withQueue(async (queue) => ({ ...enqueue(queue, entry), value: null })).then(async () => (await read('queue')).queue?.some((e) => e.key === entry.key) ?? false);
+/** Puts one save in the queue. false: there is no room, and the caller says so. */
+const keep = (entry: PendingSave) =>
+  withQueue(async (queue) => {
+    const added = enqueue(queue, entry);
+    return { queue: added.queue, value: added.ok };
+  });
 
 let retry: ReturnType<typeof setTimeout> | undefined;
 function retryLater(): void {
