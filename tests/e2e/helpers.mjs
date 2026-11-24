@@ -108,8 +108,7 @@ export async function launch(extensionDir, profileDir) {
   const context = await chromium.launchPersistentContext(profileDir, {
     channel: 'chromium', // the new headless mode: the old one cannot load extensions
     headless: !process.env.HEADED,
-    args: [`--disable-extensions-except=${extensionDir}`, `--load-extension=${extensionDir}`, ...(process.env.KE_LANG ? [`--lang=${process.env.KE_LANG}`] : [])],
-    ...(process.env.KE_LANG ? { locale: process.env.KE_LANG } : {}),
+    args: [`--disable-extensions-except=${extensionDir}`, `--load-extension=${extensionDir}`],
   });
   const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent('serviceworker'));
   return { context, worker, id: new URL(worker.url()).host };

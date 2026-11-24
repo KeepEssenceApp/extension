@@ -14,6 +14,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
+import { createServer as createTlsServer } from 'node:https';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parse } from 'yaml';
@@ -46,7 +47,9 @@ export function webpSize(b) {
   return null;
 }
 
-export function createFakeCore({ contractPath = join(here, '../contract/openapi.yaml') } = {}) {
+/** `publicUrl`: the address the fake gives out for itself (approve_url, upload_url) when a test
+    reaches it under another name than the one it listens on. */
+export function createFakeCore({ contractPath = join(here, '../contract/openapi.yaml'), publicUrl = '' } = {}) {
   const contract = parse(readFileSync(contractPath, 'utf8'));
   const limits = contract['x-limits'];
   const rules = contract['x-shared-rules'];
@@ -263,12 +266,15 @@ document.getElementById('refuse').onclick = () => go('deny');
     return fail(req, res, 404, 'not_found');
   }
 
-  const server = createServer((req, res) => void handle(req, res).catch((e) => send(res, 500, { error: { code: 'server_error', message: String(e?.message || e) } })));
+  const answer = (req, res) => void handle(req, res).catch((e) => send(res, 500, { error: { code: 'server_error', message: String(e?.message || e) } }));
+  const server = createServer(answer);
+  let tlsServer = null;
   const sockets = new Set();
-  server.on('connection', (s) => {
+  const track = (s) => {
     sockets.add(s);
     s.on('close', () => sockets.delete(s));
-  });
+  };
+  server.on('connection', track);
   return {
     state,
     get url() {
@@ -278,14 +284,24 @@ document.getElementById('refuse').onclick = () => go('deny');
       new Promise((ok, no) => {
         server.once('error', no);
         server.listen(port, '127.0.0.1', () => {
-          base = `http://127.0.0.1:${server.address().port}`;
-          ok(base);
+          const listening = `http://127.0.0.1:${server.address().port}`;
+          base = publicUrl || listening;
+          ok(listening);
         });
+      }),
+    /** the same core over HTTPS as well, for a browser that is told the real host name lives here */
+    startTls: (tls, port = 0) =>
+      new Promise((ok, no) => {
+        tlsServer = createTlsServer(tls, answer);
+        tlsServer.on('connection', track);
+        tlsServer.once('error', no);
+        tlsServer.listen(port, '127.0.0.1', () => ok(tlsServer.address().port));
       }),
     /** stops answering at once, as a core that cannot be reached; what it holds stays */
     stop: () =>
       new Promise((ok) => {
         for (const s of sockets) s.destroy();
+        tlsServer?.close();
         server.close(() => ok());
       }),
   };

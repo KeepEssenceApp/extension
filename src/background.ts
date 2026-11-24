@@ -23,7 +23,8 @@ import type { Meta, PendingSave, SaveRequest, SaveResult } from './lib/types.ts'
 import { grabImage, readSelection, showToast, type ToastOptions } from './page.ts';
 
 const t = (name: string, subs?: string | string[]) => chrome.i18n.getMessage(name, subs) || name;
-const lang = () => langOf(chrome.i18n.getUILanguage());
+/* the language of the catalogue the browser picked, so the core's sentences and this extension's own words always match */
+const lang = () => langOf(chrome.i18n.getMessage('lang'));
 
 const META_FRESH_MS = 24 * 60 * 60 * 1000;
 const RETRY_MS = 20000;

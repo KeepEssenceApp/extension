@@ -9,7 +9,7 @@ import type { DeviceCode } from './lib/types.ts';
 
 const POLL_MS = 2000;
 const t = (name: string, subs?: string | string[]) => chrome.i18n.getMessage(name, subs) || name;
-const lang = langOf(chrome.i18n.getUILanguage());
+const lang = langOf(chrome.i18n.getMessage('lang'));
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
 document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';

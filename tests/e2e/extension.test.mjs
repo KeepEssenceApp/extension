@@ -45,8 +45,9 @@ const menu = async (page, info, as) => {
 };
 const toastText = (page) => page.locator('#keepessence-toast .text');
 const expectToast = async (page, text) => {
-  await toastText(page).waitFor({ timeout: 20000 });
-  assert.equal(await toastText(page).textContent(), text);
+  /* the sentence before it may still be leaving: wait for this one, then compare exactly */
+  await until(`the sentence ${JSON.stringify(text)}`, async () => (await toastText(page).textContent({ timeout: 500 })) === text, 20000).catch(() => {});
+  assert.equal(await toastText(page).textContent({ timeout: 2000 }), text);
 };
 const select = (page, selector) =>
   page.evaluate((s) => {
@@ -69,7 +70,7 @@ before(async () => {
   /* first use: installing opens the options page by itself */
   options = await until('the options page', () => context.pages().find((p) => p.url().startsWith(`chrome-extension://${id}/options.html`)));
   await options.waitForLoadState();
-  lang = (await inWorker(() => chrome.i18n.getUILanguage())).toLowerCase().startsWith('zh') ? 'zh' : 'en';
+  lang = await inWorker(() => chrome.i18n.getMessage('lang'));
   console.log(`# backend: ${backend.name}; browser ${context.browser()?.version() ?? ''}; language ${lang}`);
 }, T);
 

@@ -125,6 +125,10 @@ cpSync(at('src/icons'), join(out, 'icons'), { recursive: true });
 cpSync(at('src/_locales'), join(out, '_locales'), { recursive: true });
 cpSync(at('src/_locales/zh_CN'), join(out, '_locales/zh_TW'), { recursive: true }); // zh_TW would otherwise fall back to English
 
+/* KE_LANG=zh node build.mjs --test: a Mac browser takes its language from the system and an
+   automated one cannot be told otherwise, so the Chinese catalogue is put where the browser looks */
+if (test && /^zh/i.test(process.env.KE_LANG || '')) cpSync(at('src/_locales/zh_CN'), join(out, '_locales/en'), { recursive: true });
+
 /* the two locales must have the same keys, or one language shows a raw key */
 const keys = (l) => Object.keys(JSON.parse(readFileSync(at('src/_locales', l, 'messages.json'), 'utf8'))).sort().join();
 if (keys('zh_CN') !== keys('en')) throw new Error('_locales: zh_CN and en do not have the same keys');

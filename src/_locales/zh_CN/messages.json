@@ -1,4 +1,5 @@
 {
+  "lang": { "message": "zh", "description": "The language of this file, zh or en. The sentences from the core are asked for in the same one." },
   "ext_name": { "message": "存入到 KeepEssence" },
   "ext_short_name": { "message": "KeepEssence" },
   "ext_description": { "message": "把当前网页、选中的文字、链接或图片存入 KeepEssence。一个动作，完成时一句话。" },
