@@ -6,6 +6,8 @@ export type Bilingual = { zh: string; en: string };
 export interface SecretPattern {
   name: string;
   regex: string;
+  flags?: string;
+  any_length?: boolean;
   description?: string;
 }
 
