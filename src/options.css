@@ -4,7 +4,8 @@ html { background: var(--ke-bg); }
 body { margin: 0; padding: 44px 20px; font: var(--ke-size-body)/1.55 var(--ke-font); color: var(--ke-text); background: var(--ke-bg); }
 main { max-width: 620px; margin: 0 auto; }
 header { display: flex; align-items: center; gap: 12px; }
-.mark { width: 40px; height: 40px; color: var(--ke-text); flex: none; }
+/* The brand's mark, unchanged: the black file on light, the white one on dark (see options.html). */
+.mark { display: block; width: 45px; height: 40px; flex: none; }
 h1 { margin: 0; font-size: var(--ke-size-title); font-weight: 600; }
 h2, summary { margin: 0 0 8px; font-size: var(--ke-size-item); font-weight: 600; }
 summary { cursor: pointer; margin: 0; }
