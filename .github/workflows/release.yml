@@ -23,6 +23,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      # Every release carries the built extension, so that it can be installed without building it.
+      - run: npm ci
+      - run: npm run build
+      - run: cp keepessence-extension-*.zip keepessence-extension.zip
       - run: npx --yes -p semantic-release@24 -p conventional-changelog-conventionalcommits@8 semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

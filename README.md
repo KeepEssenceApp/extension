@@ -25,6 +25,11 @@ The KeepEssence browser extension: save pages, text, links and images.
 
 ## 装上
 
+不想自己构建的话：到 [最新的发布](https://github.com/KeepEssenceApp/extension/releases/latest) 下载 `keepessence-extension.zip`，解压到一个不会删的文件夹，然后从下面「打开 `chrome://extensions`」那一步接着做，选解压出来的那个文件夹。
+Without building it: download `keepessence-extension.zip` from the [latest release](https://github.com/KeepEssenceApp/extension/releases/latest), unpack it into a folder you will keep, then continue below from “open `chrome://extensions`” and choose that folder.
+
+自己构建：
+
 需要 Node 22.18 以上。
 
 ```
