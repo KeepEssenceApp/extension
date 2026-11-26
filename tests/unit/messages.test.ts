@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { parse } from 'yaml';
 import { SAVE_MESSAGES } from '../../src/generated/contract.ts';
-import { langOf, sentence, toneOf } from '../../src/lib/messages.ts';
+import { langOf, sentence, sentenceInstead, toneOf } from '../../src/lib/messages.ts';
 import type { SharedRules } from '../../src/lib/types.ts';
 
 const contract = parse(readFileSync(new URL('../../contract/openapi.yaml', import.meta.url), 'utf8'));
@@ -64,4 +64,28 @@ test('rules served by a newer core win over the built-in copy', () => {
   const newer: SharedRules = { save_messages: { queued_offline: { zh: '新的说法。', en: 'New words.' } } };
   assert.equal(sentence({ type: 'queued' }, 'en', newer, SAVE_MESSAGES), 'New words.');
   assert.equal(sentence({ type: 'failed', reason: 'x' }, 'en', newer, SAVE_MESSAGES), 'Not saved: x');
+});
+
+/* QA #87: an image that was saved as its address says so, as it is */
+const INSTEAD = 'Couldn\'t get this image, so its link was saved instead.';
+const saved = { type: 'answered', result: { status: 'saved', message_key: 'saved', message: 'Saved.' } } as const;
+
+test('a save that happened says what it was instead of the core\'s plain sentence', () => {
+  assert.equal(sentenceInstead(saved, 'en', rules, SAVE_MESSAGES, INSTEAD), INSTEAD);
+  assert.equal(sentenceInstead(saved, 'en', rules, SAVE_MESSAGES), 'Saved.');
+});
+
+test('a save that was already there keeps the core\'s sentence, which is then the true one', () => {
+  const duplicate = { type: 'answered', result: { status: 'duplicate', message_key: 'duplicate', message: '' } } as const;
+  assert.equal(sentenceInstead(duplicate, 'en', rules, SAVE_MESSAGES, INSTEAD), 'Already saved. Nothing was added.');
+});
+
+test('a save that waits in the queue says it after the queued sentence: what waits is the address', () => {
+  const queued = sentence({ type: 'queued' }, 'en', rules, SAVE_MESSAGES);
+  assert.equal(sentenceInstead({ type: 'queued' }, 'en', rules, SAVE_MESSAGES, INSTEAD), `${queued} ${INSTEAD}`);
+});
+
+test('a save that did not happen says only why', () => {
+  const failed = { type: 'failed', reason: 'the image is too large' } as const;
+  assert.equal(sentenceInstead(failed, 'en', rules, SAVE_MESSAGES, INSTEAD), sentence(failed, 'en', rules, SAVE_MESSAGES));
 });
