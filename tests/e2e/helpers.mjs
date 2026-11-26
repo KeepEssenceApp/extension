@@ -74,6 +74,13 @@ export function png(width, height) {
   return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', head), chunk('IDAT', deflateSync(Buffer.concat(rows))), chunk('IEND', Buffer.alloc(0))]);
 }
 
+/** A GIF 1 x 1 pixel with `n` pictures in it (the usual smallest one, repeated). */
+export function gif(n) {
+  const header = [0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x01, 0x00, 0x01, 0x00, 0x80, 0x00, 0x00, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00];
+  const frame = [0x21, 0xf9, 0x04, 0x01, 0x0a, 0x00, 0x00, 0x00, 0x2c, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x02, 0x02, 0x44, 0x01, 0x00];
+  return Buffer.from([...header, ...Array.from({ length: n }, () => frame).flat(), 0x3b]);
+}
+
 export const SECRET = 'password = hunter2-Zx9!kLm';
 export const PARAGRAPH = '第一种最朴素：给每份活一个由内容算出来的标识。\n第二种是租约：领活的人拿到一个会过期的凭据。';
 
@@ -91,6 +98,8 @@ export async function startSite() {
   const server = createServer((req, res) => {
     const u = new URL(req.url, 'http://x');
     if (u.pathname === '/big.png') return res.writeHead(200, { 'Content-Type': 'image/png' }).end(image);
+    if (u.pathname === '/motion.gif') return res.writeHead(200, { 'Content-Type': 'image/gif' }).end(gif(3));
+    if (u.pathname === '/still.gif') return res.writeHead(200, { 'Content-Type': 'image/gif' }).end(gif(1));
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(page(u.pathname.slice(1) + u.search));
   });
   await new Promise((ok) => server.listen(0, '127.0.0.1', ok));

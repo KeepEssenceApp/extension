@@ -49,15 +49,29 @@ export function toneOf(o: Outcome): Tone {
 }
 
 /**
- * The sentence for an outcome, and what was saved instead when it is not what the user pressed (an image whose bytes could
- * not be read is saved as its address). Said as it is: a save that happened says what it was, a save that waits in the
- * queue says it after the core's own sentence, and a save that was already there, or that did not happen, keeps the plain
- * sentence, which is then the true one (QA #87).
+ * What a save says besides the core's sentence (QA #87). Each part is said only where it is true:
+ *   done     what was saved when it is not what the user pressed (an image whose bytes could not be read is saved as its
+ *            address): it replaces the core's sentence once the save has happened, and never for one that was already there;
+ *   waiting  the same, as it is while it waits in the queue: said after the core's own "queued" sentence, worded as what
+ *            will be saved, never as done;
+ *   added    something more about a save that happened and stored the picture (an animation that was kept as one frame):
+ *            added after the core's sentence, and not to a queued save, a duplicate, a failure or a save whose picture was
+ *            not stored (the quota answer).
  */
-export function sentenceInstead(o: Outcome, lang: Lang, rules: SharedRules | undefined, fallback: SaveMessages, instead?: string): string {
+export interface Said {
+  done?: string;
+  waiting?: string;
+  added?: string;
+}
+
+export function sentenceInstead(o: Outcome, lang: Lang, rules: SharedRules | undefined, fallback: SaveMessages, said?: Said): string {
   const plain = sentence(o, lang, rules, fallback);
-  if (!instead) return plain;
-  if (o.type === 'answered') return o.result.status === 'saved' ? instead : plain;
-  if (o.type === 'queued') return `${plain} ${instead}`;
+  if (!said) return plain;
+  if (o.type === 'answered') {
+    if (o.result.status !== 'saved') return plain;
+    if (said.done) return said.done;
+    return said.added && o.result.message_key === 'saved' ? `${plain} ${said.added}` : plain;
+  }
+  if (o.type === 'queued') return said.waiting ? `${plain} ${said.waiting}` : plain;
   return plain;
 }

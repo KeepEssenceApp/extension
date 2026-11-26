@@ -13,9 +13,10 @@
    Runs as a service worker, so nothing here lives in memory across events. */
 import { LIMITS, SAVE_MESSAGES } from './generated/contract.ts';
 import * as api from './lib/api.ts';
+import { gifFrames } from './lib/gif.ts';
 import { fromBase64, prepareImage } from './lib/image.ts';
 import { imageAsLink, isWeb, menuTarget, MENUS, pageRequest, type Entry, type MenuInfo } from './lib/items.ts';
-import { langOf, sentence, sentenceInstead, toneOf, type Outcome, type Tone } from './lib/messages.ts';
+import { langOf, sentence, sentenceInstead, toneOf, type Outcome, type Said, type Tone } from './lib/messages.ts';
 import { enqueue, flush, type SendOutcome } from './lib/queue.ts';
 import { secretLike } from './lib/secret.ts';
 import { mayReach, read, remove, serverAddress, write } from './lib/store.ts';
@@ -92,10 +93,10 @@ async function say(tabId: number | undefined, tone: Tone, text: string): Promise
   if (!(await toast(tabId, { tone, text, ms: SHOW_MS[tone] }))) await elsewhere(tabId, tone, text);
 }
 
-async function tell(tabId: number | undefined, o: Outcome, server?: string, instead?: string): Promise<void> {
+async function tell(tabId: number | undefined, o: Outcome, server?: string, said?: Said): Promise<void> {
   const { meta: cached } = await read('meta');
   const rules = cached && (!server || cached.server === server) ? cached.meta.shared_rules : undefined;
-  await say(tabId, toneOf(o), sentenceInstead(o, lang(), rules, SAVE_MESSAGES, instead));
+  await say(tabId, toneOf(o), sentenceInstead(o, lang(), rules, SAVE_MESSAGES, said));
 }
 
 const fail = (tabId: number | undefined, why: string, server?: string) => tell(tabId, { type: 'failed', reason: t(why) }, server);
@@ -190,31 +191,31 @@ async function flushQueue(): Promise<void> {
 
 /* ---------------------------------------------------------------- saving */
 
-async function notConnected(tabId: number | undefined, entry: PendingSave, server: string, instead?: string): Promise<void> {
-  if (await keep(entry)) await say(tabId, 'queued', instead ? `${t('not_connected')} ${instead}` : t('not_connected'));
+async function notConnected(tabId: number | undefined, entry: PendingSave, server: string, said?: Said): Promise<void> {
+  if (await keep(entry)) await say(tabId, 'queued', said?.waiting ? `${t('not_connected')} ${said.waiting}` : t('not_connected'));
   else await fail(tabId, 'why_queue_full', server);
   await chrome.runtime.openOptionsPage(); // the user just pressed: this is where connecting happens
 }
 
-/** From a finished request to the sentence. `instead`: what was saved when it is not what the user pressed (see sentenceInstead). */
-async function deliver(entry: PendingSave, tabId: number | undefined, server: string, instead?: string): Promise<void> {
+/** From a finished request to the sentence. `said`: what the sentence says besides the core's (see sentenceInstead). */
+async function deliver(entry: PendingSave, tabId: number | undefined, server: string, said?: Said): Promise<void> {
   const { credential } = await read('credential');
-  if (!credential) return notConnected(tabId, entry, server, instead);
+  if (!credential) return notConnected(tabId, entry, server, said);
   const sent = await send({ server, lang: lang(), credential }, entry);
   switch (sent.kind) {
     case 'answered':
-      await tell(tabId, { type: 'answered', result: sent.result }, server, instead);
+      await tell(tabId, { type: 'answered', result: sent.result }, server, said);
       void flushQueue();
       return;
     case 'network':
       if (await keep(entry)) {
-        await tell(tabId, { type: 'queued' }, server, instead);
+        await tell(tabId, { type: 'queued' }, server, said);
         retryLater();
       } else await fail(tabId, 'why_queue_full', server);
       return;
     case 'unauthorized': // revoked on the devices page: this browser has to be allowed again
       await remove('credential', 'device');
-      return notConnected(tabId, entry, server, instead);
+      return notConnected(tabId, entry, server, said);
     case 'error':
       return tell(tabId, { type: 'failed', reason: sent.reason }, server);
   }
@@ -309,12 +310,15 @@ async function saveImage(srcUrl: string, request: SaveRequest, tabId: number | u
   const raw = await imageBytes(srcUrl, tabId, frameId);
   if (raw === 'too_large') return fail(tabId, 'why_image_large', server);
   const prepared = raw ? await prepareImage(raw, limit(m, 'image_long_edge_px'), limit(m, 'asset_max_bytes')) : null;
-  if (prepared?.ok) return deliver({ ...newSave(request), image: prepared.image }, tabId, server);
+  // An animated GIF is drawn as one picture. Say so only when the bytes really hold more than one (counted from the file,
+  // not from its type), and not which of them: what is known is that one was kept.
+  const animated = raw ? gifFrames(new Uint8Array(await raw.arrayBuffer())) > 1 : false;
+  if (prepared?.ok) return deliver({ ...newSave(request), image: prepared.image }, tabId, server, animated ? { added: t('gif_one_frame') } : undefined);
   if (prepared && prepared.why === 'too_large') return fail(tabId, 'why_image_large', server);
   /* the browser may not read these bytes (another site's image): its address is saved as a link instead */
   const link = imageAsLink(srcUrl, request.entry);
   if (!link) return fail(tabId, 'why_image', server);
-  return deliver(newSave(link), tabId, server, t('saved_image_as_link'));
+  return deliver(newSave(link), tabId, server, { done: t('saved_image_as_link'), waiting: t('queued_image_as_link') });
 }
 
 /* ---------------------------------------------------------------- what the user presses */
