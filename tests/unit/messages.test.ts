@@ -66,26 +66,48 @@ test('rules served by a newer core win over the built-in copy', () => {
   assert.equal(sentence({ type: 'failed', reason: 'x' }, 'en', newer, SAVE_MESSAGES), 'Not saved: x');
 });
 
-/* QA #87: an image that was saved as its address says so, as it is */
-const INSTEAD = 'Couldn\'t get this image, so its link was saved instead.';
+/* QA #87: an image that was saved as its address says so, as it is: done once it happened, waiting while it waits */
+const DONE = "Couldn't get this image, so its link was saved instead.";
+const WAITING = "Couldn't get this image, so its link will be saved instead.";
+const ONE_FRAME = 'Only one frame of the animation was kept.';
+const said = { done: DONE, waiting: WAITING };
 const saved = { type: 'answered', result: { status: 'saved', message_key: 'saved', message: 'Saved.' } } as const;
 
 test('a save that happened says what it was instead of the core\'s plain sentence', () => {
-  assert.equal(sentenceInstead(saved, 'en', rules, SAVE_MESSAGES, INSTEAD), INSTEAD);
+  assert.equal(sentenceInstead(saved, 'en', rules, SAVE_MESSAGES, said), DONE);
   assert.equal(sentenceInstead(saved, 'en', rules, SAVE_MESSAGES), 'Saved.');
 });
 
 test('a save that was already there keeps the core\'s sentence, which is then the true one', () => {
   const duplicate = { type: 'answered', result: { status: 'duplicate', message_key: 'duplicate', message: '' } } as const;
-  assert.equal(sentenceInstead(duplicate, 'en', rules, SAVE_MESSAGES, INSTEAD), 'Already saved. Nothing was added.');
+  assert.equal(sentenceInstead(duplicate, 'en', rules, SAVE_MESSAGES, said), 'Already saved. Nothing was added.');
 });
 
-test('a save that waits in the queue says it after the queued sentence: what waits is the address', () => {
+test('a save that waits in the queue says what WILL be saved, after the queued sentence, never the words of a save that happened', () => {
   const queued = sentence({ type: 'queued' }, 'en', rules, SAVE_MESSAGES);
-  assert.equal(sentenceInstead({ type: 'queued' }, 'en', rules, SAVE_MESSAGES, INSTEAD), `${queued} ${INSTEAD}`);
+  const s = sentenceInstead({ type: 'queued' }, 'en', rules, SAVE_MESSAGES, said);
+  assert.equal(s, `${queued} ${WAITING}`);
+  assert.ok(s.startsWith('Not saved yet.'));
+  assert.ok(!s.includes(DONE));
+  assert.ok(!/was saved/.test(s));
+  // Only the waiting part is used while it waits: a `done` without a `waiting` adds nothing to a queued save.
+  assert.equal(sentenceInstead({ type: 'queued' }, 'en', rules, SAVE_MESSAGES, { done: DONE }), queued);
 });
 
 test('a save that did not happen says only why', () => {
   const failed = { type: 'failed', reason: 'the image is too large' } as const;
-  assert.equal(sentenceInstead(failed, 'en', rules, SAVE_MESSAGES, INSTEAD), sentence(failed, 'en', rules, SAVE_MESSAGES));
+  assert.equal(sentenceInstead(failed, 'en', rules, SAVE_MESSAGES, said), sentence(failed, 'en', rules, SAVE_MESSAGES));
+});
+
+test('an animation that was kept as one frame says so after the core\'s sentence, only when the save happened and stored the picture', () => {
+  const only = { added: ONE_FRAME };
+  assert.equal(sentenceInstead(saved, 'en', rules, SAVE_MESSAGES, only), `Saved. ${ONE_FRAME}`);
+  // Not to a save that waits, that was a duplicate, that failed, or whose picture was not stored (the quota answer).
+  assert.equal(sentenceInstead({ type: 'queued' }, 'en', rules, SAVE_MESSAGES, only), sentence({ type: 'queued' }, 'en', rules, SAVE_MESSAGES));
+  const duplicate = { type: 'answered', result: { status: 'duplicate', message_key: 'duplicate', message: '' } } as const;
+  assert.equal(sentenceInstead(duplicate, 'en', rules, SAVE_MESSAGES, only), 'Already saved. Nothing was added.');
+  const failed = { type: 'failed', reason: 'x' } as const;
+  assert.equal(sentenceInstead(failed, 'en', rules, SAVE_MESSAGES, only), 'Not saved: x');
+  const quota = { type: 'answered', result: { status: 'saved', message_key: 'saved_image_skipped_quota', message: '' } } as const;
+  assert.equal(sentenceInstead(quota, 'en', rules, SAVE_MESSAGES, only), 'Saved. The image was not stored: storage quota exceeded.');
 });

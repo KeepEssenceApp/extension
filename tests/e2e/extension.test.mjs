@@ -222,10 +222,16 @@ test('E2 context menu: the page, the selection, a link, an image', T, async () =
   await menu(page, { menuItemId: 'save-image', pageUrl, srcUrl: foreign });
   await expectToast(page, say('duplicate'));
 
+  /* an animated GIF is kept as one picture, and the sentence says so after the core's own; a still GIF says nothing more (QA #87) */
+  await menu(page, { menuItemId: 'save-image', pageUrl, srcUrl: `${site.url}/motion.gif` });
+  await expectToast(page, `${say('saved')} ${await word('gif_one_frame')}`);
+  await menu(page, { menuItemId: 'save-image', pageUrl, srcUrl: `${site.url}/still.gif` });
+  await expectToast(page, say('saved'));
+
   /* the same image again: the same bytes are not uploaded twice */
   const uploads = backend.fake?.state.requests.filter((r) => r.method === 'PUT').length;
   await menu(page, { menuItemId: 'save-image', pageUrl, srcUrl: `${site.url}/big.png` });
-  await until('the second image item', async () => (await itemsWith((i) => i.kind === 'image')).length === 2, 30000);
+  await until('the second image item', async () => (await itemsWith((i) => i.kind === 'image')).length === 4, 30000);
   if (backend.fake) assert.equal(backend.fake.state.requests.filter((r) => r.method === 'PUT').length, uploads);
   await page.close();
 });
