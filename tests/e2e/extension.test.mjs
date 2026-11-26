@@ -88,6 +88,8 @@ test('E1 connecting: a short code is shown large, asked for the save tier, and a
   assert.ok(size >= 32, `the code is large (${size}px)`);
   assert.match(await options.locator('#name').inputValue(), /^(Chrome|Chromium|Edge|Brave) on \w+$/);
   assert.equal(await options.locator('#code-say').textContent(), await word('opt_code_say'));
+  /* what happens to a picture is said here, once, and not in a window or with each save (QA #87) */
+  assert.equal(await options.locator('#images').textContent(), await word('opt_images'));
 
   /* the name can be edited; that asks for a new code */
   const first = await code();
@@ -213,7 +215,12 @@ test('E2 context menu: the page, the selection, a link, an image', T, async () =
   await menu(page, { menuItemId: 'save-image', pageUrl, srcUrl: foreign });
   const asLink = await until('the image saved by its address', async () => (await itemsWith((i) => i.url === foreign))[0], 30000);
   assert.equal(asLink.kind, 'link');
-  await expectToast(page, say('saved'));
+  /* what was saved is not what was pressed, and the sentence says so (QA #87): not the plain "saved" */
+  await expectToast(page, await word('saved_image_as_link'));
+  assert.notEqual(await word('saved_image_as_link'), say('saved'));
+  /* the same foreign image again: the address was saved already, and that is what the sentence says (the core's, the true one) */
+  await menu(page, { menuItemId: 'save-image', pageUrl, srcUrl: foreign });
+  await expectToast(page, say('duplicate'));
 
   /* the same image again: the same bytes are not uploaded twice */
   const uploads = backend.fake?.state.requests.filter((r) => r.method === 'PUT').length;

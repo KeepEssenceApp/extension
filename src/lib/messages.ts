@@ -47,3 +47,17 @@ export function toneOf(o: Outcome): Tone {
   if (o.type === 'answered') return o.result.status === 'duplicate' ? 'duplicate' : 'saved';
   return o.type;
 }
+
+/**
+ * The sentence for an outcome, and what was saved instead when it is not what the user pressed (an image whose bytes could
+ * not be read is saved as its address). Said as it is: a save that happened says what it was, a save that waits in the
+ * queue says it after the core's own sentence, and a save that was already there, or that did not happen, keeps the plain
+ * sentence, which is then the true one (QA #87).
+ */
+export function sentenceInstead(o: Outcome, lang: Lang, rules: SharedRules | undefined, fallback: SaveMessages, instead?: string): string {
+  const plain = sentence(o, lang, rules, fallback);
+  if (!instead) return plain;
+  if (o.type === 'answered') return o.result.status === 'saved' ? instead : plain;
+  if (o.type === 'queued') return `${plain} ${instead}`;
+  return plain;
+}

@@ -15,7 +15,7 @@ import { LIMITS, SAVE_MESSAGES } from './generated/contract.ts';
 import * as api from './lib/api.ts';
 import { fromBase64, prepareImage } from './lib/image.ts';
 import { imageAsLink, isWeb, menuTarget, MENUS, pageRequest, type Entry, type MenuInfo } from './lib/items.ts';
-import { langOf, sentence, toneOf, type Outcome, type Tone } from './lib/messages.ts';
+import { langOf, sentence, sentenceInstead, toneOf, type Outcome, type Tone } from './lib/messages.ts';
 import { enqueue, flush, type SendOutcome } from './lib/queue.ts';
 import { secretLike } from './lib/secret.ts';
 import { mayReach, read, remove, serverAddress, write } from './lib/store.ts';
@@ -92,10 +92,10 @@ async function say(tabId: number | undefined, tone: Tone, text: string): Promise
   if (!(await toast(tabId, { tone, text, ms: SHOW_MS[tone] }))) await elsewhere(tabId, tone, text);
 }
 
-async function tell(tabId: number | undefined, o: Outcome, server?: string): Promise<void> {
+async function tell(tabId: number | undefined, o: Outcome, server?: string, instead?: string): Promise<void> {
   const { meta: cached } = await read('meta');
   const rules = cached && (!server || cached.server === server) ? cached.meta.shared_rules : undefined;
-  await say(tabId, toneOf(o), sentence(o, lang(), rules, SAVE_MESSAGES));
+  await say(tabId, toneOf(o), sentenceInstead(o, lang(), rules, SAVE_MESSAGES, instead));
 }
 
 const fail = (tabId: number | undefined, why: string, server?: string) => tell(tabId, { type: 'failed', reason: t(why) }, server);
@@ -190,31 +190,31 @@ async function flushQueue(): Promise<void> {
 
 /* ---------------------------------------------------------------- saving */
 
-async function notConnected(tabId: number | undefined, entry: PendingSave, server: string): Promise<void> {
-  if (await keep(entry)) await say(tabId, 'queued', t('not_connected'));
+async function notConnected(tabId: number | undefined, entry: PendingSave, server: string, instead?: string): Promise<void> {
+  if (await keep(entry)) await say(tabId, 'queued', instead ? `${t('not_connected')} ${instead}` : t('not_connected'));
   else await fail(tabId, 'why_queue_full', server);
   await chrome.runtime.openOptionsPage(); // the user just pressed: this is where connecting happens
 }
 
-/** From a finished request to the sentence. */
-async function deliver(entry: PendingSave, tabId: number | undefined, server: string): Promise<void> {
+/** From a finished request to the sentence. `instead`: what was saved when it is not what the user pressed (see sentenceInstead). */
+async function deliver(entry: PendingSave, tabId: number | undefined, server: string, instead?: string): Promise<void> {
   const { credential } = await read('credential');
-  if (!credential) return notConnected(tabId, entry, server);
+  if (!credential) return notConnected(tabId, entry, server, instead);
   const sent = await send({ server, lang: lang(), credential }, entry);
   switch (sent.kind) {
     case 'answered':
-      await tell(tabId, { type: 'answered', result: sent.result }, server);
+      await tell(tabId, { type: 'answered', result: sent.result }, server, instead);
       void flushQueue();
       return;
     case 'network':
       if (await keep(entry)) {
-        await tell(tabId, { type: 'queued' }, server);
+        await tell(tabId, { type: 'queued' }, server, instead);
         retryLater();
       } else await fail(tabId, 'why_queue_full', server);
       return;
     case 'unauthorized': // revoked on the devices page: this browser has to be allowed again
       await remove('credential', 'device');
-      return notConnected(tabId, entry, server);
+      return notConnected(tabId, entry, server, instead);
     case 'error':
       return tell(tabId, { type: 'failed', reason: sent.reason }, server);
   }
@@ -314,7 +314,7 @@ async function saveImage(srcUrl: string, request: SaveRequest, tabId: number | u
   /* the browser may not read these bytes (another site's image): its address is saved as a link instead */
   const link = imageAsLink(srcUrl, request.entry);
   if (!link) return fail(tabId, 'why_image', server);
-  return deliver(newSave(link), tabId, server);
+  return deliver(newSave(link), tabId, server, t('saved_image_as_link'));
 }
 
 /* ---------------------------------------------------------------- what the user presses */
