@@ -11,11 +11,11 @@
    - This is a save-only device: nothing the user saved is ever read back (rule B11).
 
    Runs as a service worker, so nothing here lives in memory across events. */
-import { LIMITS, SAVE_MESSAGES } from './generated/contract.ts';
+import { LIMITS, SAVE_MESSAGES, SAVE_NOTES } from './generated/contract.ts';
 import * as api from './lib/api.ts';
 import { fromBase64, prepareImage } from './lib/image.ts';
 import { imageAsLink, isWeb, menuTarget, MENUS, pageRequest, type Entry, type MenuInfo } from './lib/items.ts';
-import { langOf, sentence, toneOf, type Outcome, type Tone } from './lib/messages.ts';
+import { addNote, langOf, sentence, toneOf, type Note, type Outcome, type Tone } from './lib/messages.ts';
 import { enqueue, flush, type SendOutcome } from './lib/queue.ts';
 import { secretLike } from './lib/secret.ts';
 import { mayReach, read, remove, serverAddress, write } from './lib/store.ts';
@@ -95,7 +95,7 @@ async function say(tabId: number | undefined, tone: Tone, text: string): Promise
 async function tell(tabId: number | undefined, o: Outcome, server?: string): Promise<void> {
   const { meta: cached } = await read('meta');
   const rules = cached && (!server || cached.server === server) ? cached.meta.shared_rules : undefined;
-  await say(tabId, toneOf(o), sentence(o, lang(), rules, SAVE_MESSAGES));
+  await say(tabId, toneOf(o), sentence(o, lang(), rules, SAVE_MESSAGES, SAVE_NOTES));
 }
 
 const fail = (tabId: number | undefined, why: string, server?: string) => tell(tabId, { type: 'failed', reason: t(why) }, server);
@@ -190,31 +190,31 @@ async function flushQueue(): Promise<void> {
 
 /* ---------------------------------------------------------------- saving */
 
-async function notConnected(tabId: number | undefined, entry: PendingSave, server: string): Promise<void> {
-  if (await keep(entry)) await say(tabId, 'queued', t('not_connected'));
+async function notConnected(tabId: number | undefined, entry: PendingSave, server: string, note?: Note): Promise<void> {
+  if (await keep(entry)) await say(tabId, 'queued', addNote(t('not_connected'), note, lang(), undefined, SAVE_NOTES));
   else await fail(tabId, 'why_queue_full', server);
   await chrome.runtime.openOptionsPage(); // the user just pressed: this is where connecting happens
 }
 
 /** From a finished request to the sentence. */
-async function deliver(entry: PendingSave, tabId: number | undefined, server: string): Promise<void> {
+async function deliver(entry: PendingSave, tabId: number | undefined, server: string, note?: Note): Promise<void> {
   const { credential } = await read('credential');
-  if (!credential) return notConnected(tabId, entry, server);
+  if (!credential) return notConnected(tabId, entry, server, note);
   const sent = await send({ server, lang: lang(), credential }, entry);
   switch (sent.kind) {
     case 'answered':
-      await tell(tabId, { type: 'answered', result: sent.result }, server);
+      await tell(tabId, { type: 'answered', result: sent.result, ...(note ? { note } : {}) }, server);
       void flushQueue();
       return;
     case 'network':
       if (await keep(entry)) {
-        await tell(tabId, { type: 'queued' }, server);
+        await tell(tabId, { type: 'queued', ...(note ? { note } : {}) }, server);
         retryLater();
       } else await fail(tabId, 'why_queue_full', server);
       return;
     case 'unauthorized': // revoked on the devices page: this browser has to be allowed again
       await remove('credential', 'device');
-      return notConnected(tabId, entry, server);
+      return notConnected(tabId, entry, server, note);
     case 'error':
       return tell(tabId, { type: 'failed', reason: sent.reason }, server);
   }
@@ -314,7 +314,8 @@ async function saveImage(srcUrl: string, request: SaveRequest, tabId: number | u
   /* the browser may not read these bytes (another site's image): its address is saved as a link instead */
   const link = imageAsLink(srcUrl, request.entry);
   if (!link) return fail(tabId, 'why_image', server);
-  return deliver(newSave(link), tabId, server);
+  // Said after the sentence: the user asked for the image and what is saved is its address (rule B2).
+  return deliver(newSave(link), tabId, server, 'image_as_link');
 }
 
 /* ---------------------------------------------------------------- what the user presses */

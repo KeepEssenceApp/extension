@@ -25,6 +25,11 @@ function generate() {
   for (const [key, value] of Object.entries(contract['x-shared-rules'].save_messages)) {
     if (value && typeof value === 'object' && typeof value.zh === 'string' && typeof value.en === 'string') messages[key] = { zh: value.zh, en: value.en };
   }
+  // What is added after the sentence when what was saved is not what the user gave (the pictures); one set, in the contract.
+  const notes = {};
+  for (const [key, value] of Object.entries(contract['x-shared-rules'].save_notes ?? {})) {
+    if (value && typeof value === 'object' && typeof value.zh === 'string' && typeof value.en === 'string') notes[key] = { zh: value.zh, en: value.en };
+  }
   const limits = { image_long_edge_px: contract['x-limits'].image_long_edge_px, asset_max_bytes: contract['x-limits'].asset_max_bytes };
   mkdirSync(at('src/generated'), { recursive: true });
   writeFileSync(
@@ -33,6 +38,7 @@ function generate() {
       `import type { Bilingual } from '../lib/types.ts';\n\n` +
       `export const CONTRACT_VERSION = ${JSON.stringify(contract.info.version)};\n\n` +
       `export const SAVE_MESSAGES: Record<string, Bilingual> = ${JSON.stringify(messages, null, 2)};\n\n` +
+      `export const SAVE_NOTES: Record<string, Bilingual> = ${JSON.stringify(notes, null, 2)};\n\n` +
       `export const LIMITS = ${JSON.stringify(limits, null, 2)};\n`,
   );
 }

@@ -19,6 +19,8 @@ export interface SecretRule {
 export interface SharedRules {
   secret_like?: SecretRule;
   save_messages?: Record<string, Bilingual | string>;
+  /** What follows the sentence when what was saved is not what the user gave (the pictures). */
+  save_notes?: Record<string, Bilingual | string>;
 }
 
 export interface Meta {

@@ -16,6 +16,8 @@ import { contract, launch, PARAGRAPH, root, SECRET, sleep, startBackend, startSi
 const T = { timeout: 90000 };
 let backend, site, context, id, options, lang, profile;
 const say = (key) => contract['x-shared-rules'].save_messages[key][lang];
+/** The note that follows the sentence (rule B2): the contract's, joined the way the extension joins it. */
+const noted = (sentence, key) => sentence + (lang === 'zh' ? '' : ' ') + contract['x-shared-rules'].save_notes[key][lang];
 
 /** the service worker, woken if the browser put it to sleep */
 async function sw() {
@@ -208,12 +210,12 @@ test('E2 context menu: the page, the selection, a link, an image', T, async () =
     assert.equal(put.headers.authorization, undefined, 'the credential is not sent to the upload address');
   }
 
-  /* another site's image, which the browser may not read: its address is saved as a link, and the sentence is still the core's */
+  /* another site's image, which the browser may not read: its address is saved as a link, and the sentence is the core's, then one that says so */
   const foreign = `${site.closedUrl}/big.png`;
   await menu(page, { menuItemId: 'save-image', pageUrl, srcUrl: foreign });
   const asLink = await until('the image saved by its address', async () => (await itemsWith((i) => i.url === foreign))[0], 30000);
   assert.equal(asLink.kind, 'link');
-  await expectToast(page, say('saved'));
+  await expectToast(page, noted(say('saved'), 'image_as_link'));
 
   /* the same image again: the same bytes are not uploaded twice */
   const uploads = backend.fake?.state.requests.filter((r) => r.method === 'PUT').length;
