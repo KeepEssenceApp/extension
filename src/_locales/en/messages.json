@@ -21,7 +21,7 @@
   "why_image": { "message": "the image could not be read" },
   "why_image_large": { "message": "the image is too large" },
   "saved_image_as_link": { "message": "Couldn't get this image, so its link was saved instead." },
-  "queued_image_as_link": { "message": "Couldn't get this image, so its link will be saved instead." },
+  "queued_image_as_link": { "message": "Couldn't get this image, so its link is queued instead." },
   "gif_one_frame": { "message": "Only one frame of the animation was kept." },
   "why_queue_full": { "message": "too many are queued; go online so they can be saved" },
   "why_status": { "message": "the server answered $1" },

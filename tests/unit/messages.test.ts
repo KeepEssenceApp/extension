@@ -68,9 +68,26 @@ test('rules served by a newer core win over the built-in copy', () => {
 
 /* QA #87: an image that was saved as its address says so, as it is: done once it happened, waiting while it waits */
 const DONE = "Couldn't get this image, so its link was saved instead.";
-const WAITING = "Couldn't get this image, so its link will be saved instead.";
+// While it waits, only what the extension knows: the image could not be read and its link is what is queued. Whether
+// the core saves it later is the core's answer then, so the sentence promises nothing (Project 7213889512).
+const WAITING = "Couldn't get this image, so its link is queued instead.";
 const ONE_FRAME = 'Only one frame of the animation was kept.';
 const said = { done: DONE, waiting: WAITING };
+
+test('the queued sentence in the locale files is the approved copy, and promises nothing about later', () => {
+  const locale = (lang: string, key: string) => {
+    const file = JSON.parse(readFileSync(new URL(`../../src/_locales/${lang}/messages.json`, import.meta.url), 'utf8')) as Record<string, { message: string }>;
+    return file[key]?.message;
+  };
+  assert.equal(locale('zh_CN', 'queued_image_as_link'), '这张图片取不到，排队的是它的链接。');
+  assert.equal(locale('en', 'queued_image_as_link'), WAITING);
+  for (const text of [locale('zh_CN', 'queued_image_as_link'), locale('en', 'queued_image_as_link')]) {
+    assert.ok(!/会改存|将存入|will be saved/.test(text ?? ''), 'the queue is not a promise that the core saves it');
+  }
+  // The sentence of a save that happened is unchanged.
+  assert.equal(locale('zh_CN', 'saved_image_as_link'), '这张图片取不到，存入了它的链接。');
+  assert.equal(locale('en', 'saved_image_as_link'), DONE);
+});
 const saved = { type: 'answered', result: { status: 'saved', message_key: 'saved', message: 'Saved.' } } as const;
 
 test('a save that happened says what it was instead of the core\'s plain sentence', () => {
