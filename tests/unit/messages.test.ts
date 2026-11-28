@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { parse } from 'yaml';
 import { SAVE_MESSAGES } from '../../src/generated/contract.ts';
 import { langOf, sentence, sentenceInstead, toneOf } from '../../src/lib/messages.ts';
-import type { SharedRules } from '../../src/lib/types.ts';
+import type { Bilingual, SharedRules } from '../../src/lib/types.ts';
 
 const contract = parse(readFileSync(new URL('../../contract/openapi.yaml', import.meta.url), 'utf8'));
 const rules = contract['x-shared-rules'] as SharedRules;
@@ -18,7 +18,7 @@ test('the browser language picks zh or en', () => {
 });
 
 test('the generated fallback is the contract, word for word', () => {
-  for (const key of ['saved', 'duplicate', 'saved_image_skipped_quota', 'queued_offline', 'failed', 'secret_like_question']) {
+  for (const key of ['saved', 'duplicate', 'saved_image_skipped_quota', 'saved_file_skipped_quota', 'queued_offline', 'failed', 'secret_like_question']) {
     assert.deepEqual(SAVE_MESSAGES[key], (rules.save_messages as Record<string, unknown>)[key]);
   }
 });
@@ -127,4 +127,35 @@ test('an animation that was kept as one frame says so after the core\'s sentence
   assert.equal(sentenceInstead(failed, 'en', rules, SAVE_MESSAGES, only), 'Not saved: x');
   const quota = { type: 'answered', result: { status: 'saved', message_key: 'saved_image_skipped_quota', message: '' } } as const;
   assert.equal(sentenceInstead(quota, 'en', rules, SAVE_MESSAGES, only), 'Saved. The image was not stored: storage quota exceeded.');
+});
+
+/* Over the storage quota the core names what it did not store (QA #87): a picture has `saved_image_skipped_quota`, any other
+   file `saved_file_skipped_quota`. This extension saves pictures, never files, so it meets the second key only as a key it may
+   not know; what it shows is then the core's own sentence. */
+const QUOTA = {
+  image: { zh: '已存入。图片没存入：超出存储配额。', en: 'Saved. The image was not stored: storage quota exceeded.' },
+  file: { zh: '已存入。文件没存入：超出存储配额。', en: 'Saved. The file was not stored: storage quota exceeded.' },
+};
+const quotaAnswer = (key: string, message: string) => ({ type: 'answered', result: { status: 'saved', message_key: key, message, image_stored: false } }) as const;
+
+test('over the storage quota a file says the file and an image keeps its sentence, in both languages, from the tables', () => {
+  for (const lang of ['zh', 'en'] as const) {
+    assert.equal(sentence(quotaAnswer('saved_file_skipped_quota', ''), lang, rules, SAVE_MESSAGES), QUOTA.file[lang]);
+    assert.equal(sentence(quotaAnswer('saved_image_skipped_quota', ''), lang, rules, SAVE_MESSAGES), QUOTA.image[lang]);
+    assert.equal(toneOf(quotaAnswer('saved_file_skipped_quota', '')), 'saved');
+  }
+});
+
+test('a build that does not know saved_file_skipped_quota shows the core\'s own sentence, in both languages, with no frame sentence added', () => {
+  // The tables of a build from before the key: neither the rules the core served nor the copy built in have it.
+  const { saved_file_skipped_quota: _later, ...before } = rules.save_messages as Record<string, Bilingual | string>;
+  const olderRules = { ...rules, save_messages: before } as SharedRules;
+  for (const lang of ['zh', 'en'] as const) {
+    const answer = quotaAnswer('saved_file_skipped_quota', QUOTA.file[lang]);
+    assert.equal(sentence(answer, lang, olderRules, before), QUOTA.file[lang]);
+    assert.equal(sentenceInstead(answer, lang, olderRules, before, { added: ONE_FRAME }), QUOTA.file[lang]);
+    assert.equal(sentenceInstead(quotaAnswer('saved_image_skipped_quota', ''), lang, olderRules, before, { added: ONE_FRAME }), QUOTA.image[lang]);
+  }
+  // Even with nothing served and nothing built in, the core's sentence is what is said.
+  assert.equal(sentence(quotaAnswer('saved_file_skipped_quota', QUOTA.file.zh), 'zh', undefined, {}), QUOTA.file.zh);
 });
