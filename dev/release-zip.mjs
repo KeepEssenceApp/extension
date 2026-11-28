@@ -10,8 +10,8 @@
    version, so the ZIP must say the version it is released as. The reader is the system's `unzip`,
    not the build's own ZIP writer: the check sees the file the way a person unpacking it does. */
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, existsSync, rmSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { copyFileSync, existsSync, realpathSync, rmSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -66,7 +66,19 @@ export function prepare(_config, { nextRelease, logger }) {
   logger.log('%s says version %s, the same as the release', ASSET, found);
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+/** True when this file is the script node was started with, rather than a plugin semantic-release loads.
+    Both sides as real paths: import.meta.url is one, process.argv[1] is whatever the caller typed, and
+    through a symlink (on a Mac /tmp is one) the two differ, which made the command do nothing and exit 0.
+    It must not throw: semantic-release loads this file too. */
+function isTheCommand() {
+  try {
+    return Boolean(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (isTheCommand()) {
   const [first, zip, version] = process.argv.slice(2);
   try {
     if (first === '--check' && zip && version) console.log(`ok: ${zip} says version ${checkZipVersion(zip, version)}, the same as the release ${version}`);

@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { crc32 } from 'node:zlib';
 import { ASSET, checkZipVersion, zipVersion } from '../../dev/release-zip.mjs';
 
@@ -82,6 +84,27 @@ test('a ZIP that cannot say its version fails instead of passing by default', ()
   writeFileSync(notAZip, 'this is text');
   assert.throws(() => checkZipVersion(notAZip, '1.2.3'), /cannot read manifest\.json/);
   assert.throws(() => checkZipVersion(join(dir, 'missing.zip'), '1.2.3'), /cannot read manifest\.json/);
+});
+
+/* The command line is how a person re-checks a ZIP (node dev/release-zip.mjs --check <zip> <version>). It must
+   answer the same whether the script is reached by its real path or through a symlink (on a Mac /tmp is one):
+   by the old test of "am I the script that was started" it silently did nothing there and exited 0. */
+test('the command refuses a wrong ZIP, accepts a right one and prints its usage, by the real path and through a symlink', () => {
+  const real = fileURLToPath(new URL('../../dev', import.meta.url));
+  const link = join(dir, 'dev-link');
+  symlinkSync(real, link);
+  const run = (script: string, args: string[]) => spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' });
+  for (const script of [join(real, 'release-zip.mjs'), join(link, 'release-zip.mjs')]) {
+    const wrong = run(script, ['--check', withVersion('1.0.0'), '9.9.9']);
+    assert.equal(wrong.status, 1, `${script}: a ZIP that says 1.0.0 is refused for 9.9.9`);
+    assert.match(wrong.stderr, /^FAIL: .*says version 1\.0\.0, but this release is 9\.9\.9 \(tag v9\.9\.9\)/);
+    const right = run(script, ['--check', withVersion('9.9.9'), '9.9.9']);
+    assert.equal(right.status, 0, `${script}: a ZIP that says 9.9.9 passes for 9.9.9`);
+    assert.match(right.stdout, /^ok: .* says version 9\.9\.9, the same as the release 9\.9\.9/);
+    const nothing = run(script, []);
+    assert.equal(nothing.status, 1, `${script}: no arguments is a usage error, not a pass`);
+    assert.match(nothing.stderr, /usage: node dev\/release-zip\.mjs/);
+  }
 });
 
 test('.releaserc.json runs the check before anything is published, on the file it uploads', () => {
