@@ -48,7 +48,7 @@
 
 - **图片存成了它的网址，那一句要说实话。** 右键「存入这张图片」读不到图片的字节（别的站的图、SVG）时，存的是图片的网址（`imageAsLink`）。刚存下来的，说「这张图片取不到，存入了它的链接。」；**在离线队列里等着的，只说扩展本地知道的事：「这张图片取不到，排队的是它的链接。」**（`queued_image_as_link`；不说「会改存」，那是在替核心保证以后一定存入，Project 7213889512），不能把已经存下来的那句接在队列那句后面：队列那句说「还没存入」，后面再说「存入了」就是自相矛盾（QA 复验抓到的）。之前已经存过的（`duplicate`）和没存成的，仍然是核心原来的那句，那才是真的。纯函数是 `lib/messages.ts` 的 `sentenceInstead`（参数 `Said`：`done` / `waiting` / `added` 三样各只在它为真的地方说），有单元测试。
 - **压缩的说明放在选项页，不放右键菜单，不弹窗，也不在每次存入的那句里。** `opt_images`，在「怎么用」下面一行小字。这一个入口核实过：右键图片菜单（原图不上传，最长边按契约的 `image_long_edge_px`）。别的入口没核，不写。
-- **动图被画成一张静态图，要自己数帧，只在多于一帧且图真的存下了时才说。** `createImageBitmap` + `OffscreenCanvas` 只画一帧。不能因为类型是 `image/gif` 就说，静态 GIF 没丢东西。`lib/gif.ts` 顺着 GIF 的块数图像描述符（和网页的 `src/gif.ts` 是同一份算法），多于一个才在核心那句后面加 `gif_one_frame`「动图只保留了一帧。」；说「一帧」，不说「第一帧」。排队的、重复的、没存成的、图因配额没存下的（`saved_image_skipped_quota`）都不加。只数 GIF：动图 WebP、APNG 同样只剩一帧，但网页和 iPhone 也都没数它们，三端保持一致。
+- **动图被画成一张静态图，要自己数帧，只在多于一帧且图真的存下了时才说。** `createImageBitmap` + `OffscreenCanvas` 只画一帧。不能因为类型是 `image/gif` 就说，静态 GIF 没丢东西；反过来 APNG、动态 WebP 一样只剩一帧，也不能因为不是 GIF 就不说（#87 裁定 2026-11-28）。按字节数，不按类型：`lib/frames.ts` 的 `imageFrames` 看文件头认格式（和网页的 `src/frames.ts` 是同一份算法）。GIF 顺着块数图像描述符（`lib/gif.ts`）；APNG 读第一个 `IDAT` 之前的 `acTL` 帧数；WebP 只有 `VP8X` 头里的动画标志置位才数 `ANMF` 块，带 `VP8X` 但没有动画标志的（色彩配置、透明度、元数据）是静态图。多于一帧才在核心那句后面加 `gif_one_frame`「动图只保留了一帧。」；说「一帧」，不说「第一帧」。排队的、重复的、没存成的、图因配额没存下的（`saved_image_skipped_quota`）都不加。HEIC 序列、动态 AVIF 不在范围内。
 - **选项页那一行是市场主稿的原话。** `opt_images` = 「存入的图片会先在你的设备上处理，原图不上传。」（marketing `14726f8` 的 `content/copy-drafts/image-save-notices.md`）。「不写的」那几样不要加。
 
 ## 圆角和色表（QA #107，spec e139a47）
