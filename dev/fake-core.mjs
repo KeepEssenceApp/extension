@@ -192,7 +192,9 @@ export function createFakeCore({ contractPath = join(here, '../contract/openapi.
         const item = { id: 'item_' + randomBytes(6).toString('hex'), request: r, created_at: new Date().toISOString(), device_id: d.id };
         state.items.push(item);
         const stored = !asset || asset.stored;
-        answer = { status: 201, body: result('saved', stored ? 'saved' : 'saved_image_skipped_quota', lang, { item_id: item.id, ...(asset ? { image_stored: stored } : {}) }) };
+        // As the core does: over quota an image has its sentence and any other file (a PDF, a text file) has its own.
+        const skipped = r.kind === 'image' ? 'saved_image_skipped_quota' : 'saved_file_skipped_quota';
+        answer = { status: 201, body: result('saved', stored ? 'saved' : skipped, lang, { item_id: item.id, ...(asset ? { image_stored: stored } : {}) }) };
       }
       state.idempotency.set(`${d.id} ${key}`, answer);
       return send(res, answer.status, answer.body);
