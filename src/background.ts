@@ -13,7 +13,7 @@
    Runs as a service worker, so nothing here lives in memory across events. */
 import { LIMITS, SAVE_MESSAGES } from './generated/contract.ts';
 import * as api from './lib/api.ts';
-import { gifFrames } from './lib/gif.ts';
+import { imageFrames } from './lib/frames.ts';
 import { fromBase64, prepareImage } from './lib/image.ts';
 import { imageAsLink, isWeb, menuTarget, MENUS, pageRequest, type Entry, type MenuInfo } from './lib/items.ts';
 import { langOf, sentence, sentenceInstead, toneOf, type Outcome, type Said, type Tone } from './lib/messages.ts';
@@ -310,9 +310,9 @@ async function saveImage(srcUrl: string, request: SaveRequest, tabId: number | u
   const raw = await imageBytes(srcUrl, tabId, frameId);
   if (raw === 'too_large') return fail(tabId, 'why_image_large', server);
   const prepared = raw ? await prepareImage(raw, limit(m, 'image_long_edge_px'), limit(m, 'asset_max_bytes')) : null;
-  // An animated GIF is drawn as one picture. Say so only when the bytes really hold more than one (counted from the file,
-  // not from its type), and not which of them: what is known is that one was kept.
-  const animated = raw ? gifFrames(new Uint8Array(await raw.arrayBuffer())) > 1 : false;
+  // An animation (a GIF, an APNG, an animated WebP) is drawn as one picture. Say so only when the bytes really hold more
+  // than one (counted from the file, not from its type), and not which of them: what is known is that one was kept.
+  const animated = raw ? imageFrames(new Uint8Array(await raw.arrayBuffer())) > 1 : false;
   if (prepared?.ok) return deliver({ ...newSave(request), image: prepared.image }, tabId, server, animated ? { added: t('gif_one_frame') } : undefined);
   if (prepared && prepared.why === 'too_large') return fail(tabId, 'why_image_large', server);
   /* the browser may not read these bytes (another site's image): its address is saved as a link instead */

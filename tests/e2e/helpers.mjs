@@ -81,6 +81,97 @@ export function gif(n) {
   return Buffer.from([...header, ...Array.from({ length: n }, () => frame).flat(), 0x3b]);
 }
 
+const SIDE = 8;
+const pngChunk = (type, data) => {
+  const body = Buffer.concat([Buffer.from(type, 'latin1'), data]);
+  const out = Buffer.alloc(8 + data.length + 4);
+  out.writeUInt32BE(data.length, 0);
+  body.copy(out, 4);
+  out.writeUInt32BE(crc32(body), 8 + data.length);
+  return out;
+};
+const u32 = (n) => {
+  const b = Buffer.alloc(4);
+  b.writeUInt32BE(n >>> 0);
+  return b;
+};
+const plain = (rgb) => deflateSync(Buffer.concat(Array.from({ length: SIDE }, () => Buffer.from([0, ...Array.from({ length: SIDE }, () => [...rgb, 255]).flat()]))));
+const frameControl = (sequence) => {
+  const d = Buffer.alloc(26);
+  d.writeUInt32BE(sequence, 0);
+  d.writeUInt32BE(SIDE, 4);
+  d.writeUInt32BE(SIDE, 8);
+  d.writeUInt16BE(10, 20); // 10 / 100 s
+  d.writeUInt16BE(100, 22);
+  return pngChunk('fcTL', d);
+};
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const apngHeader = () => {
+  const h = Buffer.alloc(13);
+  h.writeUInt32BE(SIDE, 0);
+  h.writeUInt32BE(SIDE, 4);
+  h.set([8, 6, 0, 0, 0], 8); // 8 bits, RGBA
+  return pngChunk('IHDR', h);
+};
+
+/** An APNG of 8 x 8 pixels that the browser can read, whose `acTL` says `frames` pictures (with 1 it is a still picture
+    that carries the chunk). `rgb` is the first picture's colour: another colour is other bytes, so another asset. */
+export function apng(frames, rgb = [200, 30, 30]) {
+  const parts = [apngHeader(), pngChunk('acTL', Buffer.concat([u32(frames), u32(0)])), frameControl(0), pngChunk('IDAT', plain(rgb))];
+  let sequence = 1;
+  for (let f = 1; f < frames; f++) parts.push(frameControl(sequence++), pngChunk('fdAT', Buffer.concat([u32(sequence++), plain([30, 30, 200])])));
+  return Buffer.concat([PNG_SIGNATURE, ...parts, pngChunk('IEND', Buffer.alloc(0))]);
+}
+
+/** The same header and chunks, with a picture that cannot be decoded: says two frames, and the browser cannot draw it. */
+export function brokenApng() {
+  return Buffer.concat([PNG_SIGNATURE, apngHeader(), pngChunk('acTL', Buffer.concat([u32(2), u32(0)])), frameControl(0), pngChunk('IDAT', Buffer.from('not a picture, however it is deflated')), frameControl(1), pngChunk('fdAT', Buffer.concat([u32(2), Buffer.from('nor this')])), pngChunk('IEND', Buffer.alloc(0))]);
+}
+
+const le = (n, bytes) => {
+  const b = Buffer.alloc(bytes);
+  b.writeUIntLE(n, 0, bytes);
+  return b;
+};
+const riffChunk = (type, data) => Buffer.concat([Buffer.from(type, 'latin1'), le(data.length, 4), data, Buffer.alloc(data.length & 1)]);
+/** A WebP made of chunks: "RIFF", the size, "WEBP", then them. */
+export function riff(...chunks) {
+  const body = Buffer.concat([Buffer.from('WEBP', 'latin1'), ...chunks]);
+  return Buffer.concat([Buffer.from('RIFF', 'latin1'), le(body.length, 4), body]);
+}
+/** The VP8X header of an 8 x 8 WebP, with these flags (0x02 is the animation flag). */
+export const vp8x = (flags) => riffChunk('VP8X', Buffer.concat([Buffer.from([flags, 0, 0, 0]), le(SIDE - 1, 3), le(SIDE - 1, 3)]));
+const anmf = (picture) => riffChunk('ANMF', Buffer.concat([le(0, 3), le(0, 3), le(SIDE - 1, 3), le(SIDE - 1, 3), le(100, 3), Buffer.from([0]), picture]));
+/** An animated WebP of `frames` pictures, each one the `picture` chunks (VP8 or VP8L, with ALPH) of a still 8 x 8 WebP. */
+export const animatedWebp = (picture, frames) => riff(vp8x(0x02), riffChunk('ANIM', Buffer.alloc(6)), ...Array.from({ length: frames }, () => anmf(picture)));
+
+/** The picture chunks (VP8 or VP8L, with ALPH) of a still 8 x 8 WebP that this browser's own encoder makes, in `colour`. */
+export async function webpPicture(page, colour = '#c81e1e') {
+  const base64 = await page.evaluate(
+    async ([side, fill]) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = side;
+      canvas.height = side;
+      const g = canvas.getContext('2d');
+      g.fillStyle = fill;
+      g.fillRect(0, 0, side, side);
+      const blob = await new Promise((res) => canvas.toBlob(res, 'image/webp', 1));
+      return btoa(String.fromCharCode(...new Uint8Array(await blob.arrayBuffer())));
+    },
+    [SIDE, colour],
+  );
+  const still = Buffer.from(base64, 'base64');
+  const keep = [];
+  for (let i = 12; i + 8 <= still.length; ) {
+    const size = still.readUInt32LE(i + 4);
+    const end = i + 8 + size + (size & 1);
+    if (['ALPH', 'VP8 ', 'VP8L'].includes(still.toString('latin1', i, i + 4))) keep.push(still.subarray(i, end));
+    i = end;
+  }
+  if (!keep.length) throw new Error('the encoder made a WebP without a picture in it');
+  return Buffer.concat(keep);
+}
+
 export const SECRET = 'password = hunter2-Zx9!kLm';
 export const PARAGRAPH = '第一种最朴素：给每份活一个由内容算出来的标识。\n第二种是租约：领活的人拿到一个会过期的凭据。';
 
@@ -95,8 +186,12 @@ export async function startSite() {
 <p><code id="secret">${SECRET}</code></p>
 <img id="img" src="/big.png" width="400" height="200">
 </body></html>`;
+  /** files a test puts on the site: path → { type, bytes } */
+  const files = new Map();
   const server = createServer((req, res) => {
     const u = new URL(req.url, 'http://x');
+    const made = files.get(u.pathname);
+    if (made) return res.writeHead(200, { 'Content-Type': made.type }).end(made.bytes);
     if (u.pathname === '/big.png') return res.writeHead(200, { 'Content-Type': 'image/png' }).end(image);
     if (u.pathname === '/motion.gif') return res.writeHead(200, { 'Content-Type': 'image/gif' }).end(gif(3));
     if (u.pathname === '/still.gif') return res.writeHead(200, { 'Content-Type': 'image/gif' }).end(gif(1));
@@ -105,6 +200,7 @@ export async function startSite() {
   await new Promise((ok) => server.listen(0, '127.0.0.1', ok));
   const port = server.address().port;
   return {
+    put: (path, type, bytes) => void files.set(path, { type, bytes }),
     /** the test build may script this host */
     url: `http://127.0.0.1:${port}`,
     /** the same site under a host the test build may not script: stands for the web store */

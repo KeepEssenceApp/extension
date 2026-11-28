@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
 import { webpSize } from '../../dev/fake-core.mjs';
-import { contract, launch, PARAGRAPH, root, SECRET, sleep, startBackend, startSite, until } from './helpers.mjs';
+import { animatedWebp, apng, brokenApng, contract, launch, PARAGRAPH, riff, root, SECRET, sleep, startBackend, startSite, until, vp8x, webpPicture } from './helpers.mjs';
 
 const T = { timeout: 90000 };
 let backend, site, context, id, options, lang, profile;
@@ -279,6 +279,82 @@ test('E2 context menu: the page, the selection, a link, an image', T, async () =
   await until('the second image item', async () => (await itemsWith((i) => i.kind === 'image')).length === 4, 30000);
   if (backend.fake) assert.equal(backend.fake.state.requests.filter((r) => r.method === 'PUT').length, uploads);
   await page.close();
+});
+
+/* QA #87 (ruling 2026-11-28): the count is the file's own, so an APNG and an animated WebP are told like a GIF. Each save is
+   read on a page of its own, so that no sentence of an earlier save is still on it. */
+const savedSentence = async (srcUrl) => {
+  const here = `${site.url}/frames`;
+  const page = await open(here);
+  await menu(page, { menuItemId: 'save-image', pageUrl: here, srcUrl });
+  await until(`a sentence for ${srcUrl}`, async () => (await toastText(page).count()) > 0, 30000);
+  const text = await toastText(page).textContent();
+  await page.close();
+  return text;
+};
+const pictures = async () => {
+  const seed = await open(`${site.url}/frames`);
+  const pics = { red: await webpPicture(seed), blue: await webpPicture(seed, '#1e90c8') };
+  await seed.close();
+  return pics;
+};
+
+test('E2 E3 an APNG and an animated WebP kept as one picture say so after the core\'s sentence, as a GIF does; a still one does not (QA #87)', T, async () => {
+  const one = await word('gif_one_frame');
+  const { red } = await pictures();
+  const cases = [
+    ['an APNG of two frames', '/two.png', 'image/png', apng(2), true],
+    ['an APNG of five frames', '/five.png', 'image/png', apng(5), true],
+    ['an animated WebP of two frames', '/two.webp', 'image/webp', animatedWebp(red, 2), true],
+    ['an animated WebP served under the wrong type', '/wrong-type.png', 'image/png', animatedWebp(red, 2), true],
+    ['a PNG that has an acTL chunk with one frame', '/one.png', 'image/png', apng(1), false],
+    ['a still WebP', '/still.webp', 'image/webp', riff(red), false],
+    ['a still WebP under a VP8X header without the animation flag', '/vp8x.webp', 'image/webp', riff(vp8x(0x10), red), false],
+    ['a WebP with the animation flag and one frame', '/flag-one.webp', 'image/webp', animatedWebp(red, 1), false],
+  ];
+  for (const [name, path, type, bytes, says] of cases) {
+    site.put(path, type, bytes);
+    assert.equal(await savedSentence(`${site.url}${path}`), says ? `${say('saved')} ${one}` : say('saved'), name);
+  }
+  assert.ok(!one.includes('第一') && !/first/i.test(one), 'it says "one frame", not which');
+});
+
+test('E3 an animation whose picture was not stored does not say that a frame was kept: not over the storage quota, not when the picture cannot be read (QA #87)', T, async (t) => {
+  const { blue } = await pictures();
+  const one = await word('gif_one_frame');
+  /* the picture cannot be drawn: its address is saved instead, and the sentence says that, not that a frame was kept */
+  site.put('/broken.png', 'image/png', brokenApng());
+  const unreadable = await savedSentence(`${site.url}/broken.png`);
+  assert.equal(unreadable, await word('saved_image_as_link'));
+  assert.ok(!unreadable.includes(one));
+  if (!backend.fake) return t.skip('a real core cannot be filled from here; the quota is covered against the fake core');
+  /* the core records the item and says the picture was not stored (new colours: the same bytes would be an asset it has already) */
+  site.put('/quota.png', 'image/png', apng(2, [11, 99, 177]));
+  site.put('/quota.webp', 'image/webp', animatedWebp(blue, 2));
+  backend.fake.state.quotaFull = true;
+  try {
+    for (const path of ['/quota.png', '/quota.webp']) assert.equal(await savedSentence(`${site.url}${path}`), say('saved_image_skipped_quota'), path);
+  } finally {
+    backend.fake.state.quotaFull = false;
+  }
+});
+
+test('E3 offline: an animation is queued and the sentence says queued, not that a frame was kept; the queue sends it later (QA #87)', T, async (t) => {
+  if (!backend.fake) return t.skip('a real core cannot be switched off from here; covered against the fake core');
+  const { blue } = await pictures();
+  site.put('/queued.png', 'image/png', apng(2, [77, 11, 150]));
+  site.put('/queued.webp', 'image/webp', animatedWebp(blue, 2));
+  const before = (await itemsWith((i) => i.kind === 'image')).length;
+  await backend.stop();
+  try {
+    for (const path of ['/queued.png', '/queued.webp']) assert.equal(await savedSentence(`${site.url}${path}`), say('queued_offline'), path);
+  } finally {
+    await backend.restart();
+  }
+  assert.equal(((await stored('queue')) ?? []).filter((q) => q.request.kind === 'image').length, 2, 'both wait in the queue');
+  await inWorker(() => void self.dispatchEvent(new Event('online')));
+  await until('the queue to empty', async () => ((await stored('queue')) ?? []).length === 0, 30000);
+  await until('the queued images to arrive', async () => (await itemsWith((i) => i.kind === 'image')).length === before + 2, 30000);
 });
 
 test('E4 text that looks like a password is asked about first: never uploaded silently, never dropped silently', T, async () => {
