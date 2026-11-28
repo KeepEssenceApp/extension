@@ -24,9 +24,10 @@ jobs:
         with:
           node-version: 22
       # Every release carries the built extension, so that it can be installed without building it.
+      # semantic-release builds it (dev/release-zip.mjs, a plugin in .releaserc.json) once it has worked
+      # out the next version, so that manifest.json says that version, and checks the ZIP it is about
+      # to upload: when the two differ the run fails before the tag and the Release are made.
       - run: npm ci
-      - run: npm run build
-      - run: cp keepessence-extension-*.zip keepessence-extension.zip
       - run: npx --yes -p semantic-release@24 -p conventional-changelog-conventionalcommits@8 semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

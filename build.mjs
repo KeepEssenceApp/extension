@@ -110,7 +110,11 @@ await build({
 });
 
 const manifest = JSON.parse(readFileSync(at('src/manifest.json'), 'utf8'));
-const { version } = JSON.parse(readFileSync(at('package.json'), 'utf8'));
+/* A release is built as the version it is about to get: dev/release-zip.mjs passes it in KE_VERSION,
+   because semantic-release only works that version out when the release run is under way and
+   package.json stays at 1.0.0. Any other build keeps package.json's version. */
+const version = process.env.KE_VERSION || JSON.parse(readFileSync(at('package.json'), 'utf8')).version;
+if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error(`the version "${version}" is not x.y.z, which is what a release gets`);
 manifest.version = version;
 if (test) {
   /* An automated browser cannot press the toolbar button, so there is no activeTab grant, and it
