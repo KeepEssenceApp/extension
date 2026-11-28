@@ -23,10 +23,13 @@ export function showToast(o: ToastOptions): boolean {
   host.style.cssText = 'all:initial;position:fixed;z-index:2147483647;right:16px;bottom:16px;';
   const root = host.attachShadow({ mode: 'open' });
   const style = document.createElement('style');
-  /* design tokens: black, white and greys carry it; red only for what loses data; the dot of the mark is gold */
+  /* design tokens: black, white and greys carry it; red only for what loses data; the dot of the mark is gold.
+     The radii are literals (this runs in the host page, which has none of our variables) and must equal
+     --ke-radius (the toast, 14px) and --ke-radius-control (the buttons, a pill) in tokens.css:
+     tests/unit/tokens.test.ts holds them to it. */
   style.textContent = `
     .toast{box-sizing:border-box;display:flex;gap:10px;align-items:flex-start;max-width:360px;padding:12px 14px;
-      border-radius:6px;border:1px solid #2C2C2C;background:#0B0B0B;color:#FFFFFF;
+      border-radius:14px;border:1px solid #2C2C2C;background:#0B0B0B;color:#FFFFFF;
       font:15px/1.45 Inter,-apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans SC","Segoe UI",sans-serif;
       opacity:0;transform:translateY(6px);transition:opacity .16s ease,transform .16s ease}
     .toast.in{opacity:1;transform:none}
@@ -34,7 +37,7 @@ export function showToast(o: ToastOptions): boolean {
     .dot{flex:none;width:8px;height:8px;margin:7px 5px 0;border-radius:50%;background:#F2877B}
     .text{overflow-wrap:anywhere}
     .row{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
-    button{all:unset;box-sizing:border-box;cursor:pointer;padding:5px 14px;border-radius:6px;font:inherit;font-size:13px;
+    button{all:unset;box-sizing:border-box;cursor:pointer;padding:5px 14px;border-radius:999px;font:inherit;font-size:13px;
       color:#FFFFFF;border:1px solid #6B6B6B}
     button.solid{color:#0B0B0B;background:#FFFFFF;border-color:#FFFFFF}
     button:focus-visible{outline:2px solid #FFFFFF;outline-offset:2px}

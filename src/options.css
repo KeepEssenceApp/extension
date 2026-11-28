@@ -12,7 +12,7 @@ summary { cursor: pointer; margin: 0; }
 details[open] summary { margin-bottom: 12px; }
 p { margin: 0 0 8px; }
 .lead { margin-top: 12px; color: var(--ke-text-2); }
-.card { margin-top: 16px; padding: 18px 20px; background: var(--ke-card); border: 1px solid var(--ke-line); border-radius: var(--ke-radius); }
+.card { margin-top: 16px; padding: 18px 20px; background: var(--ke-card); border: 1px solid var(--ke-line); border-radius: var(--ke-radius-card); }
 .plain { margin-top: 20px; padding: 0 2px; }
 .plain h2 { font-size: var(--ke-size-secondary); color: var(--ke-text-2); margin-bottom: 4px; }
 .hint { font-size: var(--ke-size-secondary); color: var(--ke-text-3); }
@@ -20,7 +20,7 @@ p { margin: 0 0 8px; }
 label { display: block; margin: 0 0 4px; font-size: var(--ke-size-secondary); color: var(--ke-text-2); }
 input { width: 100%; padding: 8px 10px; font: inherit; color: var(--ke-text); background: var(--ke-card); border: 1px solid var(--ke-line); border-radius: var(--ke-radius); margin-bottom: 6px; }
 input:focus-visible, button:focus-visible { outline: 2px solid var(--ke-text); outline-offset: 2px; }
-button { font: inherit; font-size: var(--ke-size-secondary); padding: 7px 16px; border-radius: var(--ke-radius); border: 1px solid var(--ke-solid); background: var(--ke-solid); color: var(--ke-on-solid); cursor: pointer; }
+button { font: inherit; font-size: var(--ke-size-secondary); padding: 7px 16px; border-radius: var(--ke-radius-control); border: 1px solid var(--ke-solid); background: var(--ke-solid); color: var(--ke-on-solid); cursor: pointer; }
 button.ghost { background: none; color: var(--ke-text); border-color: var(--ke-line); }
 button:disabled { opacity: .5; cursor: default; }
 .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 12px 0 8px; }

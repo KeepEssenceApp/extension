@@ -50,3 +50,9 @@
 - **压缩的说明放在选项页，不放右键菜单，不弹窗，也不在每次存入的那句里。** `opt_images`，在「怎么用」下面一行小字。这一个入口核实过：右键图片菜单（原图不上传，最长边按契约的 `image_long_edge_px`）。别的入口没核，不写。
 - **动图被画成一张静态图，要自己数帧，只在多于一帧且图真的存下了时才说。** `createImageBitmap` + `OffscreenCanvas` 只画一帧。不能因为类型是 `image/gif` 就说，静态 GIF 没丢东西。`lib/gif.ts` 顺着 GIF 的块数图像描述符（和网页的 `src/gif.ts` 是同一份算法），多于一个才在核心那句后面加 `gif_one_frame`「动图只保留了一帧。」；说「一帧」，不说「第一帧」。排队的、重复的、没存成的、图因配额没存下的（`saved_image_skipped_quota`）都不加。只数 GIF：动图 WebP、APNG 同样只剩一帧，但网页和 iPhone 也都没数它们，三端保持一致。
 - **选项页那一行是市场主稿的原话。** `opt_images` = 「存入的图片会先在你的设备上处理，原图不上传。」（marketing `14726f8` 的 `content/copy-drafts/image-save-notices.md`）。「不写的」那几样不要加。
+
+## 圆角和色表（QA #107，spec e139a47）
+
+- **只换 `src/tokens.css`，设置页的卡片、输入框、按钮会全变成 14px。** 三处原来都写 `var(--ke-radius)`，新刻度里卡片是 20、按钮是 999（胶囊），输入框才是 14。所以换色表时必须同时改组件选择器：`.card` 用 `--ke-radius-card`，`button` 用 `--ke-radius-control`，`input` 仍用 `--ke-radius`。`tests/e2e/extension.test.mjs` 里 W8 那条用真的设置页（展开「高级设置」）读浏览器算出来的圆角：卡片 20px、地址输入框 14px、保存按钮 999px。
+- **`src/tokens.css` 是 spec 的逐字副本，没有同步脚本，手拷。** `cp ../spec/design/tokens.css src/tokens.css`，再 `diff` 一次确认两边一样；半份（只抄圆角或只抄色表）会让同一个界面里新旧两套值混在一起。
+- **页内提示（`src/page.ts`）在宿主页面的 shadow root 里，读不到我们的 CSS 变量，圆角只能写死。** 提示框 14px（= `--ke-radius`），两个按钮 999px（= `--ke-radius-control`）。`tests/unit/tokens.test.ts` 把这两个写死的数和 `tokens.css` 对着，刻度以后再改时会先红；同一条 e2e 在带按钮的提示（像密码的提问）上读计算值。提示的颜色（`#0B0B0B`、`#2C2C2C`、`#6B6B6B`）这次没动，也没有测试固定它们。
