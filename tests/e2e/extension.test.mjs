@@ -123,6 +123,51 @@ test('E1 connecting: a short code is shown large, asked for the save tier, and a
   assert.deepEqual([me.data.device.name, me.data.device.tier], ['E2E Chromium', 'save']);
 });
 
+/* W8 (spec e139a47, internal-qa #107): one scale of rounding. The real options page, with "advanced" opened, and what the
+   browser computes for the three controls QA measured: sharing only the colour table left all three at 14px (card, field,
+   button), because the components still named --ke-radius. Everything is read from the browser, not from the CSS text. */
+const corners = (locator) =>
+  locator.evaluate((el) => {
+    const s = getComputedStyle(el);
+    return [s.borderTopLeftRadius, s.borderTopRightRadius, s.borderBottomRightRadius, s.borderBottomLeftRadius];
+  });
+const all = (px) => [px, px, px, px];
+
+test('W8 the options page: the card is 20px, the address field 14px, the save button a pill (999px)', T, async () => {
+  const page = await context.newPage();
+  await page.goto(`chrome-extension://${id}/options.html`);
+  await page.waitForLoadState();
+  assert.equal(await page.locator('#advanced').evaluate((el) => el.open), false, 'advanced starts closed');
+  await page.locator('#advanced > summary').click();
+  assert.equal(await page.locator('#advanced').evaluate((el) => el.open), true, 'advanced is open');
+  await page.locator('#server').waitFor({ state: 'visible' });
+  await page.locator('#server-save').waitFor({ state: 'visible' });
+
+  assert.deepEqual(await corners(page.locator('#advanced')), all('20px'), 'the card: --ke-radius-card');
+  assert.deepEqual(await corners(page.locator('#server')), all('14px'), 'the address field: --ke-radius');
+  assert.deepEqual(await corners(page.locator('#server-save')), all('999px'), 'the save button: --ke-radius-control');
+
+  /* the same scale everywhere on the page, so a control added later cannot slip back to 6px: every rounded corner is on the scale */
+  const off = await page.evaluate(() => {
+    const scale = new Set(['0px', '8px', '14px', '20px', '28px', '999px']);
+    const bad = [];
+    for (const el of document.querySelectorAll('body, body *')) {
+      const s = getComputedStyle(el);
+      for (const c of [s.borderTopLeftRadius, s.borderTopRightRadius, s.borderBottomRightRadius, s.borderBottomLeftRadius]) {
+        if (!scale.has(c)) bad.push(`${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ''} ${c}`);
+      }
+    }
+    return bad;
+  });
+  assert.deepEqual(off, [], 'no corner off the scale 0, 8, 14, 20, 28, 999');
+  /* the other cards and buttons of the page too (they are in views that are not shown now, but they are in the page) */
+  const every = (selector) => page.locator(selector).evaluateAll((els) => [...new Set(els.map((el) => getComputedStyle(el).borderTopLeftRadius))]);
+  assert.deepEqual(await every('.card'), ['20px']);
+  assert.deepEqual(await every('button'), ['999px']);
+  assert.deepEqual(await every('input'), ['14px']);
+  await page.close();
+});
+
 test('E2 E3 toolbar button: one press saves the page and says one sentence, with no window to dismiss', T, async () => {
   const page = await open(`${site.url}/toolbar`);
   const pagesBefore = context.pages().length;
@@ -248,6 +293,9 @@ test('E4 text that looks like a password is asked about first: never uploaded si
   const buttons = page.locator('#keepessence-toast button');
   assert.equal(await buttons.count(), 2);
   assert.deepEqual(await buttons.allTextContents(), [await word('ask_no'), await word('ask_yes')]);
+  /* W8: the notice in the page is a small block (14px) and its two buttons are pills (999px); literals in a shadow root (#107) */
+  assert.deepEqual(await corners(page.locator('#keepessence-toast .toast')), all('14px'), 'the notice: --ke-radius');
+  assert.deepEqual(await buttons.evaluateAll((els) => els.map((el) => getComputedStyle(el).borderTopLeftRadius)), ['999px', '999px'], 'its buttons: --ke-radius-control');
   await sleep(1500);
   assert.equal(await count(), before, 'nothing was sent while the question is open');
 
