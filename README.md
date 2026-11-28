@@ -3,7 +3,8 @@
 KeepEssence 的浏览器扩展：把网页、文字、链接、图片存进来。
 The KeepEssence browser extension: save pages, text, links and images.
 
-状态：1.0.0，可以开内测。Chromium 系浏览器（Chrome、Edge、Brave），Manifest V3。还没上架任何商店，先以「加载已解压的扩展」的方式用。
+状态：可以开内测。你下载的那个包是哪一版，看 [Releases](https://github.com/KeepEssenceApp/extension/releases) 页面上它的发布标签；v1.2.1 和 v1.2.2 在浏览器里都显示 1.0.0。Chromium 系浏览器（Chrome、Edge、Brave），Manifest V3。还没上架任何商店，先以「加载已解压的扩展」的方式用。
+Status: open for the internal beta. The version of the package you downloaded is its release tag on the [Releases](https://github.com/KeepEssenceApp/extension/releases) page; v1.2.1 and v1.2.2 both show 1.0.0 in the browser. Chromium-based browsers (Chrome, Edge, Brave), Manifest V3. Not in any store yet, so use it by loading it unpacked.
 
 ## 它做什么
 
