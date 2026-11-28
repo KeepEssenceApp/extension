@@ -36,7 +36,7 @@
 - **上一句话还没消失时，下一句已经来了。** 断言那一句话之前先等到它变成期望的那句。
 - **这个仓库的提交会过 gitleaks。** 「像密码」的测试样例要写成看起来不像真凭据的样子（重复的字符），不要关掉扫描。
 - **核心的开发端口 8791 在 Cheney 的 Mac 上被别的服务占着**（2026-11-24 看到的是 `browser-relay` 的 `relay/server.mjs`，对 `/v1/meta` 回 `{"error":"not found"}`）。对着真的核心跑之前先确认 8791 上答话的是核心。
-- 本机的 `rm`、`cp` 是带确认的别名，脚本里用 `command rm -f`。
+- 本机的 `rm`、`cp` 是带确认的别名，脚本里用 `command rm -f`、`command cp -f`。`cp` 覆盖已有文件时也会问，没人答就是「不覆盖」、文件原样不动，还原备份时很容易以为已经还原了：还原后 `diff` 一次。
 
 ## 从原型学来的
 
@@ -56,3 +56,11 @@
 - **只换 `src/tokens.css`，设置页的卡片、输入框、按钮会全变成 14px。** 三处原来都写 `var(--ke-radius)`，新刻度里卡片是 20、按钮是 999（胶囊），输入框才是 14。所以换色表时必须同时改组件选择器：`.card` 用 `--ke-radius-card`，`button` 用 `--ke-radius-control`，`input` 仍用 `--ke-radius`。`tests/e2e/extension.test.mjs` 里 W8 那条用真的设置页（展开「高级设置」）读浏览器算出来的圆角：卡片 20px、地址输入框 14px、保存按钮 999px。
 - **`src/tokens.css` 是 spec 的逐字副本，没有同步脚本，手拷。** `cp ../spec/design/tokens.css src/tokens.css`，再 `diff` 一次确认两边一样；半份（只抄圆角或只抄色表）会让同一个界面里新旧两套值混在一起。
 - **页内提示（`src/page.ts`）在宿主页面的 shadow root 里，读不到我们的 CSS 变量，圆角只能写死。** 提示框 14px（= `--ke-radius`），两个按钮 999px（= `--ke-radius-control`）。`tests/unit/tokens.test.ts` 把这两个写死的数和 `tokens.css` 对着，刻度以后再改时会先红；同一条 e2e 在带按钮的提示（像密码的提问）上读计算值。提示的颜色（`#0B0B0B`、`#2C2C2C`、`#6B6B6B`）这次没动，也没有测试固定它们。
+
+## 发布包的版本号（extension#8）
+
+- **发布 ZIP 里 `manifest.json` 的 `version` 以前一直是 `1.0.0`。** v1.2.1 和 v1.2.2 的 ZIP 内容不同（38,589 与 38,594 字节），manifest 却完全一样，没法从浏览器的扩展页看出装的是哪一版。原因：`build.mjs` 把 `package.json` 的版本写进 manifest，而发布工作流在 semantic-release 算出下一个版本**之前**就打了包，`package.json` 又一直是 `1.0.0`（没有谁去改它）。已经发布的两个资产不改、不重传。
+- **现在的做法：** 打包交给 semantic-release 的一个本地插件 `dev/release-zip.mjs`（`.releaserc.json` 里列在 `@semantic-release/github` 前面）。它的 `prepare` 步骤在版本号算出来之后、打 tag 和建 GitHub Release 之前运行：用环境变量 `KE_VERSION` 把版本传给 `build.mjs`，生成 `keepessence-extension.zip`，再用系统的 `unzip -p … manifest.json` 从**这个文件**里读回版本，和发布的版本不一样就抛错。`prepare` 抛错时 semantic-release 在打 tag 之前就退出，什么都没发布。`release.yml` 里原来那两步（`npm run build`、`cp`）去掉了，它们早于版本号。
+- **普通的 `npm run build`（本地、CI 的 artifact）仍然是 `package.json` 的 `1.0.0`。** 那不是发布包，别拿它当发布包的版本去比。
+- **`semantic-release --dry-run` 不运行 `prepare`**（日志是 `Skip step "prepare" … in dry-run mode`），所以不能用它演练这道检查。离线演练：`node dev/release-zip.mjs 99.0.0`（造一个编造版本的包并检查；CI 的「release ZIP drill」步骤跑的就是这条，外加 `node dev/release-zip.mjs --check keepessence-extension.zip 99.0.1` 必须失败）。要演练「检查失败时不发布」，用一次性的本地裸仓库当 origin，去掉 `@semantic-release/github`，真跑一次 semantic-release；`--repository-url` 要写 `file:///…`，写本地路径会让 release-notes 插件报 `Invalid URL`。
+- **检查读 ZIP 用的是系统的 `unzip`，不是 `build.mjs` 里自己写的 ZIP 写入器。** 这样看到的和人解压时看到的一样；GitHub 的 ubuntu 运行器有 `unzip`，没有的机器上检查会失败，不会悄悄跳过。

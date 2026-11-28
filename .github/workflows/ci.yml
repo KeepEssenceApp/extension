@@ -28,3 +28,11 @@ jobs:
           name: keepessence-extension
           path: keepessence-extension-*.zip
           if-no-files-found: error
+      # The release run packages the ZIP as the version semantic-release has just worked out and checks
+      # it (dev/release-zip.mjs). Rehearse that with a made-up version, so a broken build or check shows
+      # here and not on a release. Nothing is published.
+      - name: release ZIP drill
+        run: |
+          node dev/release-zip.mjs 99.0.0
+          unzip -p keepessence-extension.zip manifest.json | grep '"version": "99.0.0"'
+          if node dev/release-zip.mjs --check keepessence-extension.zip 99.0.1; then echo "a ZIP of 99.0.0 passed as 99.0.1"; exit 1; fi
